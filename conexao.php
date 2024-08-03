@@ -1,7 +1,8 @@
 <?php
 
-$caminhoAbsoluto = __DIR__ . '/banco.sqlite';
-$pdo = new PDO('sqlite:' . $caminhoAbsoluto);
+use Alura\Pdo\Infrastructure\Persistence\ConnectionCreator;
+
+$pdo = ConnectionCreator::createConnection();
 
 echo "Conexão realizada com sucesso!";
 
