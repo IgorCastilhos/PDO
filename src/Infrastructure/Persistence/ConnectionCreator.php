@@ -12,3 +12,5 @@ class ConnectionCreator
         return new PDO('sqlite:' . $caminhoAbsoluto);
     }
 }
+
+// 21:55
