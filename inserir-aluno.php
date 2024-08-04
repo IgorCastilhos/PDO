@@ -9,7 +9,7 @@ $pdo = ConnectionCreator::createConnection();
 
 $student = new Student(
     null,
-    "Cristiano Ronaldo",
+    "Marquinhos",
     new DateTimeImmutable('1990-12-07')
 );
 
@@ -29,5 +29,3 @@ if ($statement->execute()) {
 }
 
 exit();
-
-//var_dump($pdo->exec($sqlInsert));

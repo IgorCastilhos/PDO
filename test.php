@@ -2,7 +2,6 @@
 
 use Alura\Pdo\Infrastructure\Repository\PdoStudentRepository;
 
-$pdo = new PDO('mysql:');
+$pdo = new PDO('sqlite:');
 $repository = new PdoStudentRepository($pdo);
 
-empty($repository->allStudents());

@@ -2,21 +2,21 @@
 
 namespace Alura\Pdo\Infrastructure\Repository;
 
+use Alura\Pdo\Domain\Model\Phone;
 use Alura\Pdo\Domain\Model\Student;
 use Alura\Pdo\Domain\Repository\StudentRepository;
-use DateTimeImmutable;
 use PDO;
 
 class PdoStudentRepository implements StudentRepository
 {
-    private \PDO $connection;
+    private PDO $connection;
 
     public function __construct(PDO $connection)
     {
         $this->connection = $connection;
     }
 
-    #[\Override] public function allStudents(): array
+    public function allStudents(): array
     {
         $sqlSearchAllStudentsQuery = 'SELECT * FROM students;';
         $statement = $this->connection->query($sqlSearchAllStudentsQuery);
@@ -24,7 +24,7 @@ class PdoStudentRepository implements StudentRepository
         return $this->hydrateStudentList($statement);
     }
 
-    #[\Override] public function studentsBirthAt(DateTimeImmutable $birthDate): array
+    public function studentsBirthAt(\DateTimeInterface $birthDate): array
     {
         $sqlStudentsBirthQuery = 'SELECT * FROM students WHERE birth_date = ?;';
         $preparedStatement = $this->connection->prepare($sqlStudentsBirthQuery);
@@ -34,25 +34,26 @@ class PdoStudentRepository implements StudentRepository
         return $this->hydrateStudentList($preparedStatement);
     }
 
-    private function hydrateStudentList(false|\PDOStatement $statement)
+    private function hydrateStudentList(\PDOStatement $statement): array
     {
-        $studentsDataList = $statement->fetchAll(PDO::FETCH_ASSOC);
+        $studentsDataList = $statement->fetchAll();
         $studentsList = [];
 
         foreach ($studentsDataList as $studentData) {
             $studentsList[] = new Student(
                 $studentData['id'],
                 $studentData['name'],
-                new DateTimeImmutable($studentData['birth_date'])
+                new \DateTimeImmutable($studentData['birth_date'])
             );
         }
+
         return $studentsList;
     }
 
-    #[\Override] public function save(Student $student): bool
+    public function save(Student $student): bool
     {
         if ($student->id() === null) {
-            $this->insert($student);
+            return $this->insert($student);
         }
 
         return $this->update($student);
@@ -60,24 +61,12 @@ class PdoStudentRepository implements StudentRepository
 
     private function insert(Student $student): bool
     {
-        /*
-        USANDO O PLACEHOLDER DE SINAL DE INTERROGAÇÃO
-        $sqlInsert = "INSERT INTO students (name, birth_date) VALUES (?, ?);";
-        $statement = $this->connection->prepare($sqlInsert);
+        $insertQuery = 'INSERT INTO students (name, birth_date) VALUES (:name, :birth_date);';
+        $stmt = $this->connection->prepare($insertQuery);
 
-        $success = $statement->execute([
-            $student->name(),
-            $student->birthDate()->format('Y-m-d')
-        ]);
-         */
-
-        // USANDO NAMED PLACEHOLDERS
-        $sqlInsert = "INSERT INTO students (name, birth_date) VALUES (:name, :birth_date);";
-        $statement = $this->connection->prepare($sqlInsert);
-
-        $success = $statement->execute([
-            ':name', $student->name(),
-            ':birth_date', $student->birthDate()->format('Y-m-d')
+        $success = $stmt->execute([
+            ':name' => $student->name(),
+            ':birth_date' => $student->birthDate()->format('Y-m-d'),
         ]);
 
         if ($success) {
@@ -92,17 +81,46 @@ class PdoStudentRepository implements StudentRepository
         $sqlUpdateQuery = 'UPDATE students SET name = :name, birth_date = :birth_date WHERE id = :id;';
         $preparedStatement = $this->connection->prepare($sqlUpdateQuery);
         $preparedStatement->bindValue(':name', $student->name());
-        $preparedStatement->bindValue(':birth_date', $student->birthDate());
+        $preparedStatement->bindValue(':birth_date', $student->birthDate()->format('Y-m-d'));
         $preparedStatement->bindValue('id', $student->id(), PDO::PARAM_INT);
 
         return $preparedStatement->execute();
     }
 
-    #[\Override] public function remove(Student $student): bool
+    public function remove(Student $student): bool
     {
         $preparedStatement = $this->connection->prepare('DELETE FROM students WHERE id = ?;');
         $preparedStatement->bindValue(1, $student->id(), PDO::PARAM_INT);
 
         return $preparedStatement->execute();
+    }
+
+    public function studentsWithPhones(): array
+    {
+        $sqlQuery = 'SELECT students.id,
+                            students.name,
+                            students.birth_date,
+                            phones.id AS phone_id,
+                            phones.area_code,
+                            phones.number
+                        FROM students
+                        JOIN phones ON students.id = phones.student_id;';
+        $statement = $this->connection->query($sqlQuery);
+        $result = $statement->fetchAll();
+        $studentList = [];
+
+        foreach ($result as $row) {
+            if (!array_key_exists($row['id'], $studentList)) {
+                $studentList[$row['id']] = new Student(
+                    $row['id'],
+                    $row['name'],
+                    new \DateTimeImmutable($row['birth_date'])
+                );
+            }
+            $phone = new Phone($row['phone_id'], $row['area_code'], $row['number']);
+            $studentList[$row['id']]->addPhone($phone);
+        }
+
+        return $studentList;
     }
 }
